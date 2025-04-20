@@ -7,6 +7,7 @@ using std::endl;
 
 namespace MemoryPool
 {
+    
     template <class T>
     class ObjectPool
     {
