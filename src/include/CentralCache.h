@@ -22,6 +22,8 @@ namespace MemoryPool
 
         void pushFront(Span* sp);
 
+        Span* popFront();
+        
         Span* getOneSpan(size_t size);
 
         size_t fetchRangeObj(void*& begin,void*& end,size_t betch_size,size_t size);
@@ -31,7 +33,7 @@ namespace MemoryPool
 
         iterator end() { return _head; }
 
-        bool empty() const { return _head == nullptr; }
+        bool empty() const { return _head->_next == _head; }
     private:
         iterator _head;
         std::mutex _mtx; // 定义桶锁,不同的桶互相安全

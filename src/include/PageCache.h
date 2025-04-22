@@ -1,5 +1,8 @@
+#pragma once
 #include "Common.hpp"
-#include "./include/CentralCache.h"
+
+
+#include "CentralCache.h"
 namespace MemoryPool
 {
     
@@ -25,7 +28,7 @@ namespace MemoryPool
         // 这里hash桶的下标代表的是需要的页数
         // _page_lists[n]表示n页的span链表
         SpanList _page_lists[NPAGES];
-        std::mutex _mtx;  //
+        std::mutex _page_mtx;  //
         
         static PageCache* _self;
     };

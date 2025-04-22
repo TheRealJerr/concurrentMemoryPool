@@ -4,7 +4,7 @@
 #include <ctime>
 #include <cassert>
 #include <algorithm>
-
+#include <unistd.h>
 
 // 管理切分好的小对象链表
 
@@ -15,18 +15,22 @@ static const size_t MAX_BYTES = 1024 * 256;
 static const size_t NFREELISTS = 208; // thread cache中桶的个数
 
 // page哈希桶的大小
-static const size_t NPAGES = 128;
+static const size_t NPAGES = 129;
 
 static const size_t PAGE_SHIFT = 13; // 代表一页是2 ^ 13
+
+static const size_t PAGE_SIZE = 1 << PAGE_SHIFT; // 代表一页是8 kb
+
+static const size_t DEFAULT_PAGES = 128; // 默认page cache向堆中一次申请128页的大小
 
 #ifdef __linux__
 
 #if defined(__x86_64__)
-    using PAGE_ID = unsigned long long; 
+using PAGE_ID = unsigned long long;
 #elif defined(__i386__)
-    using PAGE_ID = size_t
+using PAGE_ID = size_t
 #elif
-    
+
 #endif
 
 #endif
@@ -34,7 +38,7 @@ static const size_t PAGE_SHIFT = 13; // 代表一页是2 ^ 13
 static const size_t MAX_BITES = 25 * 1024;
 
 static const size_t PAGES = 129;
-// 管理空间表  
+// 管理空间表
 class FreeList
 {
 public:
@@ -52,14 +56,15 @@ public:
         return ret;
     }
 
-    void pushRange(void* begin,void* end)
+    void pushRange(void *begin, void *end)
     {
         NEXT_OBJ(end) = _free_list;
         _free_list = begin;
     }
     bool empty() const { return _free_list == nullptr; }
     size_t maxSize() const { return _max_size; }
-    size_t setMaxSize(size_t max_size) { _max_size = max_size; }
+    void setMaxSize(size_t max_size) { _max_size = max_size; }
+
 private:
     void *_free_list = nullptr;
     size_t _max_size = 1;
@@ -69,21 +74,14 @@ private:
 class SizeClass
 {
 
-    // 计算出对齐数
-    static size_t inline roundUpHelper(size_t size, size_t alignment_number)
+
+public:
+    static inline size_t roundUpHelper(size_t bytes, size_t alignNum)
     {
-        size_t align_size = 0;
-        if (size / alignment_number != 0)
-            align_size = (size / alignment_number + 1) * alignment_number;
-        else
-            align_size = size;
-        return align_size;
+        return ((bytes + alignNum - 1) & ~(alignNum - 1));
     }
 
-    
-public:
-   
-    static size_t inline roundUp(size_t size)
+    static inline size_t roundUp(size_t size)
     {
         if (size <= 128)
         {
@@ -107,8 +105,7 @@ public:
         }
         else
         {
-            assert(false);
-            return 0;
+            return roundUpHelper(size, 1 << PAGE_SHIFT);
         }
     }
     static inline size_t indexHelper(size_t bytes, size_t align_shift)
@@ -120,7 +117,7 @@ public:
     {
         assert(bytes <= MAX_BYTES);
         // 每个区间有多少个桶
-        static int group_array[4] = {16, 56, 56, 56}; 
+        static int group_array[4] = {16, 56, 56, 56};
         if (bytes <= 128)
         {
             return indexHelper(bytes, 3);
@@ -152,15 +149,17 @@ public:
     static size_t numMoveSize(size_t size)
     {
         // 慢开始的启动的算法
-        
+
         // 这个算法保证了分配不会太大
         // 同时也不会太小
 
         assert(size > 0);
         size_t betch_size = 0;
         betch_size = MAX_BITES / size;
-        if(betch_size <= 2) betch_size = 2;
-        if(betch_size > 512) betch_size = 512;
+        if (betch_size <= 2)
+            betch_size = 2;
+        if (betch_size > 512)
+            betch_size = 512;
         return betch_size;
     }
     // 通过大小获取页的大小
@@ -169,9 +168,10 @@ public:
         size_t num = numMoveSize(size);
         size_t npage = num * size;
 
-        npage <<= PAGE_SHIFT;
+        npage >>= PAGE_SHIFT;
 
-        if(npage == 0) npage = 1;
+        if (npage == 0)
+            npage = 1;
         return npage;
     }
 };
@@ -181,23 +181,23 @@ public:
 struct Span
 {
     PAGE_ID _id;
-    size_t _n;  // 页的数量
+    size_t _n; // 页的数量
 
-    
-    Span* _next = nullptr;
-    Span* _prev = nullptr;
+    Span *_next = nullptr;
+    Span *_prev = nullptr;
 
     size_t _use_count; // 内存切好的小块内存分配给thread cache的计数
-    
-    void* _free_list;  // 切好的小块内存
+
+    void *_free_list; // 切好的小块内存
 
     // 从这个span中获取betch_size大的内存块
-    size_t fetchRangeObj(void*& begin,void*& end,size_t betch_size)
+    size_t fetchRangeObj(void *&begin, void *&end, size_t betch_size)
     {
-        void* cur = _free_list;
-        void* cur_prev = nullptr;
+        
+        void *cur = _free_list;
+        void *cur_prev = nullptr;
         size_t count = 0;
-        while(count < betch_size && cur != nullptr)
+        while (count < betch_size && cur != nullptr)
         {
             cur_prev = cur;
             cur = NEXT_OBJ(cur);

@@ -1,5 +1,5 @@
 #include "./include/ThreadCache.h"
-#include "CentralCache.h"
+#include "./include/CentralCache.h"
 namespace MemoryPool
 {
     void* ThreadCache::allocate(size_t size)
@@ -20,6 +20,7 @@ namespace MemoryPool
     void* ThreadCache::fetchFromCentralCache(size_t index,size_t size)
     {
         // 这里类似于tcp连接时候的慢增长模式
+        std::cout << "从central cache申请数据" << std::endl;
         size_t betch_size = std::min(_free_lists[index].maxSize(),SizeClass::numMoveSize(size));
         if(_free_lists[index].maxSize() == betch_size)
             _free_lists[index].setMaxSize(betch_size + 1); // 慢增长
@@ -27,7 +28,7 @@ namespace MemoryPool
         void* begin = nullptr, *end = nullptr;
         size_t actual_size = CentralCache::getInstance()->fetchRangeObj(begin,end,betch_size,size);
         assert(actual_size >= 1); // 至少给我一个内存吧
-
+        std::cout << "申请到了：" << actual_size << "大的内存" << std::endl;
         if(actual_size == 1)
         {
             assert(begin == end && begin != nullptr);

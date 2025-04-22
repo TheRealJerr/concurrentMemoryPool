@@ -4,18 +4,22 @@ void Alloc1()
 {
     for(size_t i = 0;i < 5;i++)
     {
+        std::cout << "开始申请内存" << std::endl;
         void* ptr = ConcurrentAlloc(6);
         (void)ptr;
-        ConcurrentDeAlloc(ptr,6);
+        if(ptr) std::cout << "应用层申请成功" << std::endl;
+        
+        // ConcurrentDeAlloc(ptr,6);
     }
 }
 void Alloc2()
 {
     for(size_t i = 0;i < 7;i++)
     {
+
         void* ptr = ConcurrentAlloc(6);
         (void)ptr;
-        ConcurrentDeAlloc(ptr,6);
+        // ConcurrentDeAlloc(ptr,6);
     }
 }
 void TLSTest()
