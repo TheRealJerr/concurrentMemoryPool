@@ -5,7 +5,13 @@
 namespace MemoryPool
 {
 
-
+    // 由于spanList被复用与page cache和 central cache,
+    // 所以需要针对不同的场景
+    enum class Choice
+    {
+        NO_LOCK = 0,
+        LOCK,
+    };
     // 双向循环链表
     class SpanList
     {
@@ -28,12 +34,15 @@ namespace MemoryPool
 
         size_t fetchRangeObj(void*& begin,void*& end,size_t betch_size,size_t size);
         
+        
         // 提供迭代器进行遍历
         iterator begin() { return _head->_next; }
 
         iterator end() { return _head; }
 
         bool empty() const { return _head->_next == _head; }
+
+        void releaseToSpan(void* start);
     private:
         iterator _head;
         std::mutex _mtx; // 定义桶锁,不同的桶互相安全
@@ -63,7 +72,7 @@ namespace MemoryPool
         size_t fetchRangeObj(void*& obj,void*& end,size_t betch_size,size_t size);
         // 获取一个非空的span
 
-
+        void releaseListToSpan(void* start,size_t bytes);
     private:
         // 定义桶锁
         SpanList _span_lists[NFREELISTS];

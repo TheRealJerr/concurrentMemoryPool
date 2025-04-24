@@ -46,6 +46,31 @@ namespace MemoryPool
         erase(begin());
         return ret;
     }
+    void SpanList::releaseToSpan(void *start)
+    {
+        _mtx.lock();
+        
+        while (start)
+        {
+            void *next = NEXT_OBJ(start);
+            auto* sp = PageCache::getInstance()->MapObjectToSpan(start);
+            sp->pushFront(start);
+            // 说明某个Span所有的小的内存块都回收成功
+            if(sp->useCount() == 0)
+            {
+                erase(sp);// 
+                sp->_free_list = nullptr;
+                sp->_prev = sp->_next = nullptr;
+
+                // 释放span的时候,使我们的page cache进行操作,这段时间内,我们允许其他线程访问central cache进行资源的获取和释放
+                _mtx.unlock(); // 将锁进行解除
+                PageCache::getInstance()->releaseSpanToPageCache(sp);
+                _mtx.lock();
+            }
+            start = next;
+        }
+        _mtx.unlock();
+    }
 
     Span *SpanList::getOneSpan(size_t size)
     {
@@ -72,7 +97,7 @@ namespace MemoryPool
         // 将大块内存切成自由列表挂起来
         char *page_end_address = page_start_address + bytes;
         // 进行切割
-        sp->_free_list = (void*)page_start_address;
+        sp->_free_list = (void *)page_start_address;
         char *cur = page_start_address + size;
         void *prev = sp->_free_list;
         while (cur < page_end_address)
@@ -83,10 +108,10 @@ namespace MemoryPool
         }
         NEXT_OBJ(prev) = nullptr;
         // 这个时候添加获取到的span
-        
+
         // 这里不用加锁应为push Front是线程安全的(里面加了锁,如果加锁就会死锁)
         pushFront(sp);
-        
+
         return sp;
     }
     // 从freelist[index]中获取span并且从span中获取
@@ -96,5 +121,9 @@ namespace MemoryPool
         assert(betch_size > 0); // 至少获取一个大小的内存块
         return _span_lists[index].fetchRangeObj(begin, end, betch_size, size);
     }
-
+    void CentralCache::releaseListToSpan(void *start, size_t bytes)
+    {
+        size_t index = SizeClass::index(bytes);
+        _span_lists[index].releaseToSpan(start);
+    }
 } // namespace MemoryPool

@@ -11,11 +11,7 @@ namespace MemoryPool
         return fetchFromCentralCache(index,rounde_up_size);// 测试代码
     }
 
-    void ThreadCache::dellocate(void* ptr,size_t size)
-    {
-        size_t index = SizeClass::index(size);
-        _free_lists[index].push(ptr);
-    }   
+   
     // 这里拿到的size已经是内存对齐后的size
     void* ThreadCache::fetchFromCentralCache(size_t index,size_t size)
     {
@@ -37,10 +33,31 @@ namespace MemoryPool
         else
         {
             // 将多余的数据返回我们的thread cache
-            _free_lists[index].pushRange(NEXT_OBJ(begin),end);
+            _free_lists[index].pushRange(NEXT_OBJ(begin),end,actual_size - 1);
             return begin;
         }
         throw std::bad_alloc();
         return nullptr;
     }
+
+    void ThreadCache::dellocate(void* ptr,size_t size)
+    {
+        size_t index = SizeClass::index(size);
+        _free_lists[index].push(ptr);
+
+        // 当链表的长度大于一次批量申请内存的时候,释放内存给central cache
+        if(_free_lists[index].size() >= _free_lists[index].maxSize())
+        {
+            std::cout << "从thread cache回收内存到central cache" << std::endl;
+            listTooLong(_free_lists[index],size);
+        }
+    }   
+    // 从free_list中拿出一个批量的内存块
+    void ThreadCache::listTooLong(FreeList& freelist,size_t size)
+    {
+        void* start = nullptr, *end = nullptr;
+        freelist.popRange(start,end,freelist.maxSize());
+        CentralCache::getInstance()->releaseListToSpan(start,size);
+    }
+
 }

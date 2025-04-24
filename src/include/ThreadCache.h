@@ -17,6 +17,8 @@ namespace MemoryPool
         void dellocate(void* ptr,size_t size);
         
         void* fetchFromCentralCache(size_t index,size_t size);
+
+        void listTooLong(FreeList& freelist,size_t size);
     private:
         FreeList _free_lists[NFREELISTS]; // hash桶式结构来进行判断
     };

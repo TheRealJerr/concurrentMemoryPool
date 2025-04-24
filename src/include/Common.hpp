@@ -5,7 +5,8 @@
 #include <cassert>
 #include <algorithm>
 #include <unistd.h>
-
+#include <unordered_map>
+#include <atomic>
 // 管理切分好的小对象链表
 
 #define NEXT_OBJ(obj) (*(void **)obj) // 获取头部四个字节的next指针
@@ -47,27 +48,45 @@ public:
         assert(obj);
         NEXT_OBJ(obj) = _free_list;
         _free_list = obj;
+        _size++;
     }
     void *pop()
     {
         assert(_free_list);
         void *ret = _free_list;
         _free_list = NEXT_OBJ(_free_list);
+        _size--;
         return ret;
     }
 
-    void pushRange(void *begin, void *end)
+    void pushRange(void *begin, void *end,size_t n)
     {
         NEXT_OBJ(end) = _free_list;
         _free_list = begin;
+        _size += n;
+    }
+
+    void popRange(void*& begin,void*& end,size_t n)
+    {
+        // assert(n >= _size);
+        begin = _free_list;
+        for(size_t i = 0;i < n - 1;i++)
+            end = NEXT_OBJ(end);
+        _free_list = NEXT_OBJ(end);
+        NEXT_OBJ(end) = nullptr;
+        _size -= n;
     }
     bool empty() const { return _free_list == nullptr; }
+    
     size_t maxSize() const { return _max_size; }
+    
     void setMaxSize(size_t max_size) { _max_size = max_size; }
 
+    size_t size() const { return _size; }
 private:
     void *_free_list = nullptr;
     size_t _max_size = 1;
+    size_t _size;
 };
 
 // 对齐映射规则
@@ -190,10 +209,11 @@ struct Span
 
     void *_free_list; // 切好的小块内存
 
+    std::atomic<bool> _used;
+    
     // 从这个span中获取betch_size大的内存块
     size_t fetchRangeObj(void *&begin, void *&end, size_t betch_size)
     {
-        
         void *cur = _free_list;
         void *cur_prev = nullptr;
         size_t count = 0;
@@ -207,6 +227,15 @@ struct Span
         NEXT_OBJ(cur_prev) = nullptr;
         begin = _free_list, end = cur_prev;
         _free_list = cur;
+        _use_count += count;
         return count;
     }
+    void pushFront(void* ptr)
+    {
+        NEXT_OBJ(ptr) = _free_list;;
+        _free_list = ptr;
+        _use_count--; // 回收了一个小块内存
+    }
+
+    size_t useCount() const { return _use_count; }
 };
