@@ -1,5 +1,7 @@
 # concurrentMemoryPool
 
+> create by hrj on 4.27 2025
+
 效仿tcmalloc实现的高并发内存池
 
 tcmalloc主要分为了三层
@@ -15,4 +17,12 @@ central cache采取懒汉模式(第一次获取时初始化),由于其中hash桶
 
 ## page cache
 
+page cache中维护了一个根据页数作业键值的定长hash表,通过页号的管理，可以减少外内存碎片的问题
 
+##
+
+如果size < 256 kb我们直接找三层缓存
+
+如果size > 256 kb && size < 128 * 8k， 可以直接访问page cache
+
+如果 > 128 * 8k , 直接使用sbrk开辟内存
