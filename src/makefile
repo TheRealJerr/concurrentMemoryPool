@@ -1,6 +1,6 @@
 # 编译器和标志
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall  -g
+CXXFLAGS = -std=c++17 -Wall  -g 
 LDFLAGS = -lpthread
 
 # 文件列表
@@ -8,7 +8,6 @@ SRC = $(wildcard *.cpp)
 OBJ = $(SRC:.cpp=.o)
 BIN = bin
 
-# 默认目标
 $(BIN): $(OBJ)
 	$(CXX) $(OBJ) $(LDFLAGS) -o $@
 

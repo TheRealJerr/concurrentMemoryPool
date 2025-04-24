@@ -10,7 +10,23 @@ namespace MemoryPool
     Span* PageCache::getNPageSpan(size_t pages)
     {
 
-        assert(pages >= 0 && pages <= NPAGES);
+        if(pages >= NPAGES) 
+        {
+            std::cout << "申请超大内存" << std::endl;
+            void* ptr = ::sbrk(pages * PAGE_SIZE);
+            if(ptr == nullptr)
+                throw std::bad_alloc();
+            
+            Span* sp = new Span();
+            sp->_id = (PAGE_ID)ptr >> PAGE_SHIFT;
+            sp->_n = pages;
+            // 添加缓存
+            {
+                std::unique_lock<std::mutex> lock(_page_mtx);
+                _id_span_map[sp->_id] = sp;
+            }
+            return sp;
+        }
         // 首先找找pages位置
         {
             std::unique_lock<std::mutex> lock(_page_mtx);
@@ -52,7 +68,7 @@ namespace MemoryPool
         // pages树中可能什么都没有
         // 这个时候我们需要向堆申请一个128页的span
         Span* large_span = new Span;
-        void* large_memory = ::sbrk(PAGE_SIZE * DEFAULT_PAGES);
+        void* large_memory = MALLOC(PAGE_SIZE * DEFAULT_PAGES);
         if(large_memory == nullptr)
             throw std::bad_alloc();
         large_span->_n = DEFAULT_PAGES;
@@ -65,9 +81,10 @@ namespace MemoryPool
         // 这里不用再次添加hash映射,因为会复用上方的切分代码
         return getNPageSpan(pages);// 解决这个资源缺失的问题，复用上方的代码
     }
-
+    // 封装提供给外部的接口，应该加锁
     Span* PageCache::MapObjectToSpan(void* ptr)
     {
+        std::unique_lock<std::mutex> lock(_page_mtx);
         PAGE_ID id = (PAGE_ID)ptr >> PAGE_SHIFT;
         if(_id_span_map.count(id) == 0) assert(false);
         return _id_span_map[id];
@@ -76,8 +93,18 @@ namespace MemoryPool
     // 我们要将sp中的头部和尾部进行合并
     void PageCache::releaseSpanToPageCache(Span* sp)
     {
-        std::cout << "申请page cache的锁" << std::endl;
+
         std::unique_lock<std::mutex> lock(_page_mtx);
+
+        if((sp->_n) >= NPAGES)
+        {
+            void* ptr = (void*)(sp->_id << PAGE_SHIFT);
+            FREE(ptr);
+            // 删除映射
+            _id_span_map.erase(sp->_id);
+            delete sp;
+            return;
+        }
         // 对sp的前后页进行合并缓解内存碎片的问题   
         // 这里不能直接使用use_count
         // 1. 当前页可以处于正在切分的状态
@@ -98,6 +125,7 @@ namespace MemoryPool
             _page_lists[it->second->_n].erase(it->second);
             // 删除hash映射
             // 切分的时候会重构映射
+            std::cout << "发生了合并" << std::endl;
             _id_span_map.erase(it->second->_id);
             delete it->second;
         }
@@ -117,6 +145,8 @@ namespace MemoryPool
             _page_lists[it->second->_n].erase(it->second);
             // 删除hash映射
             // 切分的时候会重构映射
+            std::cout << "发生了合并" << std::endl;
+
             _id_span_map.erase(it->second->_id);
             delete it->second;
         }

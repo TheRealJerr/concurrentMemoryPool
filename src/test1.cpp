@@ -1,6 +1,7 @@
 #include "./include/ConcurrentAlloc.h"
 #include <iostream>
 #include <vector>
+
 class Data
 {
 public:
@@ -56,6 +57,16 @@ void testTheadAlloc()
         v.push_back(ConcurrentAlloc(6));
     for(auto* ptr : v)
         ConcurrentDeAlloc(ptr,6);
+
+}
+void testBigAlloc()
+{
+    void* ptr1 = ConcurrentAlloc(257 * 1024);
+
+    void* ptr2 = ConcurrentAlloc(129 * PAGE_SIZE);
+
+    ConcurrentDeAlloc(ptr1,257 * 1024);
+    ConcurrentDeAlloc(ptr2,129 * PAGE_SIZE);
 }
 void TLSTest()
 {
@@ -69,6 +80,7 @@ void TLSTest()
 
 int main()
 {
-    TLSTest();
+    std::thread t(testBigAlloc);
+    if(t.joinable()) t.join();
     return 0;
 }

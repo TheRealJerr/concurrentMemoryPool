@@ -24,17 +24,37 @@ static const size_t PAGE_SIZE = 1 << PAGE_SHIFT; // 代表一页是8 kb
 
 static const size_t DEFAULT_PAGES = 128; // 默认page cache向堆中一次申请128页的大小
 
+// linux环境
 #ifdef __linux__
+
+#define MALLOC(SIZE) ::sbrk(SIZE)
+#define FREE(PTR) ::brk(PTR)
 
 #if defined(__x86_64__)
 using PAGE_ID = unsigned long long;
 #elif defined(__i386__)
 using PAGE_ID = size_t
-#elif
 
 #endif
 
 #endif
+
+// windows环境
+#ifdef _WIN32
+
+#include <windows.h>
+
+#define MALLOC(SIZE) VirtualAlloc(NULL, SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE)
+#define FREE(PTR) VirtualFree(PTR, 0, MEM_RELEASE)
+
+#if defined(_WIN64)
+using PAGE_ID = unsigned long long;
+#elif defined(_WIN32)
+using PAGE_ID = size_t;
+#endif
+
+#endif
+
 
 static const size_t MAX_BITES = 25 * 1024;
 
@@ -123,7 +143,7 @@ public:
         {
             return roundUpHelper(size, 8 * 1024);
         }
-        else
+        else // 以page对齐
         {
             return roundUpHelper(size, 1 << PAGE_SHIFT);
         }
