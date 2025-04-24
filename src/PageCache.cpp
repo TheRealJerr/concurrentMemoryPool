@@ -76,6 +76,7 @@ namespace MemoryPool
     // 我们要将sp中的头部和尾部进行合并
     void PageCache::releaseSpanToPageCache(Span* sp)
     {
+        std::cout << "申请page cache的锁" << std::endl;
         std::unique_lock<std::mutex> lock(_page_mtx);
         // 对sp的前后页进行合并缓解内存碎片的问题   
         // 这里不能直接使用use_count
@@ -88,7 +89,7 @@ namespace MemoryPool
             // 一直往前扩
             PAGE_ID prev_id = sp->_id - 1;
             auto it = _id_span_map.find(prev_id);
-            if(it->second->_used == true || it == _id_span_map.end()) break;
+            if(it == _id_span_map.end() || it->second->_used == true) break;
             // 这个时候说明是可以合并的
             if(sp->_n + it->second->_n > 128) break; // 超过128就不合并了
             
@@ -100,14 +101,15 @@ namespace MemoryPool
             _id_span_map.erase(it->second->_id);
             delete it->second;
         }
-
+        std::cout << "向前合并成功" << std::endl;
         // 1. 向后合并
         while(true)
         {
             // 一直往后扩
             PAGE_ID next_id = sp->_id + sp->_n;
             auto it = _id_span_map.find(next_id);
-            if(it->second->_used == true || it == _id_span_map.end()) break;
+            // 这里又是遇到的一个错,就是end和second->_used先后的问题
+            if(it == _id_span_map.end() || it->second->_used == true) break;
             // 这个时候说明是可以合并的
             if(sp->_n + it->second->_n > 128) break; // 超过128就不合并了
             
@@ -118,6 +120,7 @@ namespace MemoryPool
             _id_span_map.erase(it->second->_id);
             delete it->second;
         }
+        std::cout << "向后合并成功" << std::endl;
         // 这个时候sp是一个很大的sp
         _page_lists[sp->_n].pushFront(sp);
         // 方便进行合并

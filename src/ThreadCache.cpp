@@ -49,7 +49,9 @@ namespace MemoryPool
         if(_free_lists[index].size() >= _free_lists[index].maxSize())
         {
             std::cout << "从thread cache回收内存到central cache" << std::endl;
+            std::cout << "size:" << _free_lists[index].size() << std::endl;
             listTooLong(_free_lists[index],size);
+            std::cout << "释放成功" << std::endl;
         }
     }   
     // 从free_list中拿出一个批量的内存块
@@ -57,6 +59,7 @@ namespace MemoryPool
     {
         void* start = nullptr, *end = nullptr;
         freelist.popRange(start,end,freelist.maxSize());
+        std::cout << "释放给span" << std::endl;
         CentralCache::getInstance()->releaseListToSpan(start,size);
     }
 

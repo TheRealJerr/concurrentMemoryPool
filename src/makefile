@@ -1,6 +1,6 @@
 # 编译器和标志
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -O2 -g
+CXXFLAGS = -std=c++17 -Wall  -g
 LDFLAGS = -lpthread
 
 # 文件列表

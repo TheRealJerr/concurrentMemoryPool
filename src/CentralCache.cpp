@@ -58,7 +58,10 @@ namespace MemoryPool
             // 说明某个Span所有的小的内存块都回收成功
             if(sp->useCount() == 0)
             {
+                std::cout << "释放给page cache" << std::endl;
+                _mtx.unlock();// 这里是一个坑, erase是线程安全的,所以erase之前应该释放锁
                 erase(sp);// 
+                _mtx.lock();
                 sp->_free_list = nullptr;
                 sp->_prev = sp->_next = nullptr;
 

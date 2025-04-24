@@ -68,8 +68,9 @@ public:
 
     void popRange(void*& begin,void*& end,size_t n)
     {
-        // assert(n >= _size);
+        assert(n <= _size);
         begin = _free_list;
+        end = _free_list;
         for(size_t i = 0;i < n - 1;i++)
             end = NEXT_OBJ(end);
         _free_list = NEXT_OBJ(end);
@@ -86,7 +87,7 @@ public:
 private:
     void *_free_list = nullptr;
     size_t _max_size = 1;
-    size_t _size;
+    size_t _size = 0;
 };
 
 // 对齐映射规则
