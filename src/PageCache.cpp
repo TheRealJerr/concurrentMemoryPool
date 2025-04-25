@@ -12,7 +12,6 @@ namespace MemoryPool
 
         if(pages >= NPAGES) 
         {
-            std::cout << "申请超大内存" << std::endl;
             void* ptr = MALLOC(pages * PAGE_SIZE);
             if(ptr == nullptr)
                 throw std::bad_alloc();
@@ -24,6 +23,7 @@ namespace MemoryPool
             {
                 std::unique_lock<std::mutex> lock(_page_mtx);
                 _id_span_map[sp->_id] = sp;
+                _id_span_map[sp->_id + sp->_n - 1] = sp;
             }
             return sp;
         }
@@ -33,6 +33,8 @@ namespace MemoryPool
             if(_page_lists[pages].empty() == false)
             {
                 Span* ret = _page_lists[pages].popFront();
+                for(PAGE_ID i = ret->_id;i < (ret->_id + ret->_n);i++)
+                    _id_span_map[i] = ret;
                 ret->_used = true;
                 return ret;
             }
@@ -86,7 +88,10 @@ namespace MemoryPool
     {
         std::unique_lock<std::mutex> lock(_page_mtx);
         PAGE_ID id = (PAGE_ID)ptr >> PAGE_SHIFT;
-        if(_id_span_map.count(id) == 0) assert(false);
+        if(_id_span_map.count(id) == 0) {
+            ELOG("%d没有在map中找到",(int)id);
+            assert(false);
+        }
         return _id_span_map[id];
     }   
     // 将span归还给page cache合并
@@ -101,7 +106,6 @@ namespace MemoryPool
             void* ptr = (void*)(sp->_id << PAGE_SHIFT);
             FREE(ptr);
             // 删除映射
-            _id_span_map.erase(sp->_id);
             gspace_creater.delSpan(sp);
             return;
         }

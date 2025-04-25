@@ -29,7 +29,6 @@ namespace MemoryPool
         void operator()(ThreadCache* ptr)
         {
             gspace_creater.delThreadCache(ptr);
-            std::cout << "执行线程析构器" << std::endl;
         }
     };
     extern thread_local std::unique_ptr<ThreadCache,ThreadCacheDeltor> pTLSThreadCache; // 没有线程独立的tls 

@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <unordered_map>
 #include <atomic>
+#include "log.hpp"
 
 #include <memory>
 // 管理切分好的小对象链表
@@ -86,6 +87,11 @@ public:
 
     void pushRange(void *begin, void *end,size_t n)
     {
+
+        //
+        // 检测一下
+        assert(begin);
+        assert(end);
         NEXT_OBJ(end) = _free_list;
         _free_list = begin;
         _size += n;
@@ -240,21 +246,22 @@ struct Span
     // 从这个span中获取betch_size大的内存块
     size_t fetchRangeObj(void *&begin, void *&end, size_t betch_size)
     {
+        if(_free_list == nullptr) return 0;
         void *cur = _free_list;
-        void *cur_prev = nullptr;
+        begin = _free_list;
         size_t count = 0;
-        while (count < betch_size && cur != nullptr)
+        while(count < betch_size - 1 && NEXT_OBJ(cur) != nullptr)
         {
-            cur_prev = cur;
-            cur = NEXT_OBJ(cur);
             count++;
+            cur = NEXT_OBJ(cur);
         }
         // 获取到了[_free_list,cur_prev]大的内存空间
-        NEXT_OBJ(cur_prev) = nullptr;
-        begin = _free_list, end = cur_prev;
-        _free_list = cur;
-        _use_count += count;
-        return count;
+        _free_list = NEXT_OBJ(cur);
+        NEXT_OBJ(cur) = nullptr;
+        end = cur;
+
+        _use_count += (count + 1);
+        return count + 1;
     }
     void pushFront(void* ptr)
     {

@@ -77,9 +77,3 @@ void TLSTest()
 
 } 
 
-
-int main()
-{
-    TLSTest();
-    return 0;
-}

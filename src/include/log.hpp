@@ -10,62 +10,33 @@
 #include <fstream>
 
 
-namespace Log
-{
-    enum class LogLevel
-    {
-        ERROR,
-        INFO,
-        FATAL,
-    };
 
-    //
-    std::string getCurTime()
-    {
-        auto now = std::chrono::system_clock::now();
 
-        // 转换为 time_t（C风格时间）
-        std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+// 1. 日志宏的定义
 
-        // 转换为本地时间字符串
-        std::stringstream ssm;
-        ssm << std::ctime(&now_time);
-        return ssm.str();
+#define LDBG 0
+#define LINF 1
+#define LERR 2
+
+#define LDFAULT LDBG
+
+inline std::mutex global_log_lock;
+// 定义日志字段
+#define LOG(level, format, ...)                                                                 \
+    {                                                                                           \
+        std::unique_lock<std::mutex>                                                            \
+            lock(global_log_lock);                                                              \
+        if (level >= LDFAULT)                                                                   \
+        {                                                                                       \
+            time_t current_time;                                                                \
+            time(&current_time);                                                                \
+            struct tm *curtime = localtime(&current_time);                                      \
+            char format_str[32] = {0};                                                          \
+            strftime(format_str, 31, "%m-%d %T", curtime);                                      \
+            printf("[%s][%s:%d]: " format "\n", format_str, __FILE__, __LINE__, ##__VA_ARGS__); \
+        }                                                                                       \
     }
 
-    class LogClass
-    {
-        LogClass():_ofs(_filename)
-        {
-            
-        }
-
-
-    public:
-        
-        static LogClass& getInstance() 
-        {
-            if(_self == nullptr) _self = new LogClass();
-            return *_self;
-        } 
-
-        static void setFileName(const std::string& filename)
-        {
-            _filename = filename;
-        }
-        template <class T>
-        LogClass& operator<<(T&& args)
-        {
-            _ofs << args;
-            return *this;
-        }
-
-    private:
-        std::mutex _mtx;
-        std::ofstream _ofs;
-        static std::string _filename;
-        static inline LogClass* _self =  nullptr;
-    };
-
-#define ENABLE_FILE_LOG() LogClass::setFileName()
-}
+#define DLOG(format, ...) LOG(LDBG, format, ##__VA_ARGS__)
+#define ILOG(format, ...) LOG(LINF, format, ##__VA_ARGS__)
+#define ELOG(format, ...) LOG(LERR, format, ##__VA_ARGS__)

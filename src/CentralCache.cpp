@@ -9,7 +9,6 @@ namespace MemoryPool
     {
         assert(pos && newpos);
         //
-        std::unique_lock<std::mutex> lock(_mtx);
         Span *prev = pos->_prev;
         prev->_next = newpos;
         newpos->_prev = prev;
@@ -28,12 +27,26 @@ namespace MemoryPool
 
     size_t SpanList::fetchRangeObj(void *&begin, void *&end, size_t betch_size, size_t size)
     {
+        // 能够保证一定获取到一个有效的Span指针
+        // 将桶锁锁上
+        _mtx.lock();
         Span *sp = getOneSpan(size); // 获取一个有效的span*指针
-
+        // 现在一个重要的问题就是sp可能我们获得的时候已经为空了
+        // if(sp && sp->_free_list) ELOG("获取到了一个合理的span,请求多大的内存:%d",(int)(betch_size));
+        auto ret = sp->fetchRangeObj(begin, end, betch_size);
+        sp->_use_count += ret;
+        // 检查一下
+        void* test = begin;
+        size_t t = 1;
+        while(test != end)
         {
-            std::unique_lock<std::mutex> lock(_mtx);
-            return sp->fetchRangeObj(begin, end, betch_size);
+            test = NEXT_OBJ(test);
+            t++;
         }
+        assert(t == ret);
+        // 释放铜锁
+        _mtx.unlock();
+        return ret;
     }
     void SpanList::pushFront(Span *sp)
     {
@@ -58,7 +71,7 @@ namespace MemoryPool
             // 说明某个Span所有的小的内存块都回收成功
             if(sp->useCount() == 0)
             {
-                std::cout << "释放给page cache" << std::endl;
+                // std::cout << "释放给page cache" << std::endl;
                 _mtx.unlock();// 这里是一个坑, erase是线程安全的,所以erase之前应该释放锁
                 erase(sp);// 
                 _mtx.lock();
@@ -78,21 +91,21 @@ namespace MemoryPool
     Span *SpanList::getOneSpan(size_t size)
     {
         // 申请资源加锁
+        // 从现在的桶中寻找是否有合适的Span模块
+        iterator it = begin();
+        while (it != end())
         {
-            std::unique_lock<std::mutex> lock(_mtx);
-            iterator it = begin();
-            while (it != end())
-            {
-                if (it->_free_list)
-                    return it;
-                it = it->_next;
-            }
+            if (it->_free_list)
+                return it;
+            it = it->_next;
         }
         // 这个时候我们合理应该释放锁，方便其他线程归还资源
         // 找不到通过page cache进行申请
         // fetchRangeFromPages
-        std::cout << "从page cache申请内存" << std::endl;
+        // ELOG("central cache中数据不足,通过page cache申请页数:%d",(int)SizeClass::numMovePage(size));
+        _mtx.unlock();
         Span *sp = PageCache::getInstance()->getNPageSpan(SizeClass::numMovePage(size));
+        // if(sp && sp->_free_list) ELOG("从page cache中申请成功,span的页数:%d,对齐内存的大小:%d",(int)sp->_n,(int)size);
         // 算出span的其实地址
         char *page_start_address = (char *)(sp->_id << PAGE_SHIFT);
         // 计算大块内存的大小
@@ -111,7 +124,7 @@ namespace MemoryPool
         }
         NEXT_OBJ(prev) = nullptr;
         // 这个时候添加获取到的span
-
+        _mtx.lock();
         // 这里不用加锁应为push Front是线程安全的(里面加了锁,如果加锁就会死锁)
         pushFront(sp);
 

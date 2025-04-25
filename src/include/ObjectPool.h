@@ -15,7 +15,6 @@ namespace MemoryPool
         ObjectPool(size_t size = default_object_size) : // 默认申请128 kb 的大小
                                                 _free_list(nullptr)
         {
-
             _memory = (char*)MALLOC(size);
             if (_memory == nullptr)
                 throw std::bad_alloc();
