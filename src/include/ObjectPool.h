@@ -4,19 +4,19 @@ using std::cout;
 using std::endl;
 #include <unistd.h>
 // 定长内存池的实现
-
+#include "Common.hpp"
 namespace MemoryPool
 {
-    
+    const size_t default_object_size = 1024 * 128;
     template <class T>
     class ObjectPool
     {
     public:
-        ObjectPool(size_t size = 1024 * 4096) : // 默认申请4 kb 的大小
+        ObjectPool(size_t size = default_object_size) : // 默认申请128 kb 的大小
                                                 _free_list(nullptr)
         {
 
-            _memory = (char*)::sbrk(size);
+            _memory = (char*)MALLOC(size);
             if (_memory == nullptr)
                 throw std::bad_alloc();
             _remain_bytes = size;
@@ -36,10 +36,10 @@ namespace MemoryPool
             {
                 if (_remain_bytes <= sizeof(T))
                 {
-                    _memory = (char*)::sbrk(1024 * 4096);
+                    _memory = (char*)MALLOC(default_object_size);
                     if (_memory == nullptr)
                         throw std::bad_alloc();
-                    _remain_bytes = 1024 * 4096;
+                    _remain_bytes = default_object_size;
                 }
                 obj = (T *)_memory;
                 size_t objSize = sizeof(T) < sizeof(void*) ? sizeof(void*) : sizeof(T);

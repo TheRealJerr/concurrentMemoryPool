@@ -80,7 +80,6 @@ void TLSTest()
 
 int main()
 {
-    std::thread t(testBigAlloc);
-    if(t.joinable()) t.join();
+    TLSTest();
     return 0;
 }

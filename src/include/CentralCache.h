@@ -64,9 +64,7 @@ namespace MemoryPool
         // 懒汉模式
         static CentralCache* getInstance()
         {
-            if(_self == nullptr)
-                _self = new CentralCache();
-            return _self;
+            return &_self;
         }
         // 返回值是实际给的
         size_t fetchRangeObj(void*& obj,void*& end,size_t betch_size,size_t size);
@@ -76,6 +74,6 @@ namespace MemoryPool
     private:
         // 定义桶锁
         SpanList _span_lists[NFREELISTS];
-        static CentralCache* _self;
+        static CentralCache _self;
     };  
 }

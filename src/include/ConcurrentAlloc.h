@@ -7,7 +7,7 @@ static void* ConcurrentAlloc(size_t size)
 {
     if(MemoryPool::pTLSThreadCache == nullptr)
     {
-        MemoryPool::pTLSThreadCache = new MemoryPool::ThreadCache();
+        MemoryPool::pTLSThreadCache.reset(gspace_creater.newThreadCache());
     }
     
     if(size <= MAX_BITES)

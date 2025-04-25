@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <unordered_map>
 #include <atomic>
+
+#include <memory>
 // 管理切分好的小对象链表
 
 #define NEXT_OBJ(obj) (*(void **)obj) // 获取头部四个字节的next指针
@@ -59,6 +61,9 @@ using PAGE_ID = size_t;
 static const size_t MAX_BITES = 25 * 1024;
 
 static const size_t PAGES = 129;
+
+#include "ObjectPool.h"
+
 // 管理空间表
 class FreeList
 {
@@ -259,4 +264,29 @@ struct Span
     }
 
     size_t useCount() const { return _use_count; }
+
+    
 };
+namespace MemoryPool
+{
+    class ThreadCache;
+}
+
+class SpaceCreater
+{
+public:
+    Span* newSpan();
+
+    MemoryPool::ThreadCache* newThreadCache();
+
+    
+    void delSpan(Span* ptr);
+ 
+
+    void delThreadCache(MemoryPool::ThreadCache* ptr);
+private:
+    MemoryPool::ObjectPool<Span> _sp_pool;
+    MemoryPool::ObjectPool<MemoryPool::ThreadCache> _tc_pool; 
+};
+
+inline SpaceCreater gspace_creater;

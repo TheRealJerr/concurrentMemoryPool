@@ -13,11 +13,11 @@ namespace MemoryPool
         if(pages >= NPAGES) 
         {
             std::cout << "申请超大内存" << std::endl;
-            void* ptr = ::sbrk(pages * PAGE_SIZE);
+            void* ptr = MALLOC(pages * PAGE_SIZE);
             if(ptr == nullptr)
                 throw std::bad_alloc();
             
-            Span* sp = new Span();
+            Span* sp = gspace_creater.newSpan();
             sp->_id = (PAGE_ID)ptr >> PAGE_SHIFT;
             sp->_n = pages;
             // 添加缓存
@@ -43,7 +43,7 @@ namespace MemoryPool
                 if(_page_lists[i].empty() == false)
                 {
                     Span* nsp = _page_lists[i].popFront();
-                    Span* ksp = new Span();
+                    Span* ksp = gspace_creater.newSpan();
                     // 
                     // 从n个页的span中切出k个span
                     ksp->_used = true;
@@ -67,7 +67,7 @@ namespace MemoryPool
         // 最开始的时候，可能什么都没有
         // pages树中可能什么都没有
         // 这个时候我们需要向堆申请一个128页的span
-        Span* large_span = new Span;
+        Span* large_span = gspace_creater.newSpan();
         void* large_memory = MALLOC(PAGE_SIZE * DEFAULT_PAGES);
         if(large_memory == nullptr)
             throw std::bad_alloc();
@@ -102,7 +102,7 @@ namespace MemoryPool
             FREE(ptr);
             // 删除映射
             _id_span_map.erase(sp->_id);
-            delete sp;
+            gspace_creater.delSpan(sp);
             return;
         }
         // 对sp的前后页进行合并缓解内存碎片的问题   
@@ -127,7 +127,7 @@ namespace MemoryPool
             // 切分的时候会重构映射
             std::cout << "发生了合并" << std::endl;
             _id_span_map.erase(it->second->_id);
-            delete it->second;
+            gspace_creater.delSpan(it->second);
         }
         std::cout << "向前合并成功" << std::endl;
         // 1. 向后合并
@@ -148,7 +148,8 @@ namespace MemoryPool
             std::cout << "发生了合并" << std::endl;
 
             _id_span_map.erase(it->second->_id);
-            delete it->second;
+            gspace_creater.delSpan(it->second);
+
         }
         std::cout << "向后合并成功" << std::endl;
         // 这个时候sp是一个很大的sp

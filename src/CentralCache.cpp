@@ -3,7 +3,7 @@
 namespace MemoryPool
 {
     // 针对声明进行定义
-    CentralCache *CentralCache::_self = nullptr;
+    CentralCache CentralCache::_self;
 
     void SpanList::insert(SpanList::iterator pos, Span *newpos)
     {

@@ -2,6 +2,7 @@
 #include "./include/CentralCache.h"
 namespace MemoryPool
 {
+    thread_local std::unique_ptr<ThreadCache,ThreadCacheDeltor> pTLSThreadCache = nullptr;
     void* ThreadCache::allocate(size_t size)
     {
         size_t rounde_up_size = SizeClass::roundUp(size); // 内存对齐
